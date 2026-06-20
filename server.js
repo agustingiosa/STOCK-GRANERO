@@ -215,6 +215,16 @@ app.delete('/api/history', (req, res) => {
 });
 
 // ============================================
+// API - Backup
+// ============================================
+
+app.get('/api/backup', (req, res) => {
+    const dbPath = path.join(__dirname, 'restaurant-stock.db');
+    const filename = `stock-backup-${new Date().toISOString().split('T')[0]}.db`;
+    res.download(dbPath, filename);
+});
+
+// ============================================
 // Iniciar servidor
 // ============================================
 
