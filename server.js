@@ -4,6 +4,7 @@
 
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
 const Database = require('better-sqlite3');
 
 const app = express();
@@ -197,6 +198,7 @@ app.post('/api/history/daily', (req, res) => {
         });
 
         transaction();
+        createBackup();
         res.json({ success: true, count: entries.length });
     } catch (e) {
         res.status(500).json({ error: e.message });
@@ -215,13 +217,65 @@ app.delete('/api/history', (req, res) => {
 });
 
 // ============================================
+// Backups automáticos
+// ============================================
+
+const BACKUP_DIR = path.join(__dirname, 'backups');
+const MAX_BACKUPS = 30;
+
+if (!fs.existsSync(BACKUP_DIR)) fs.mkdirSync(BACKUP_DIR);
+
+async function createBackup() {
+    const now = new Date();
+    const timestamp = now.toISOString().replace('T', '_').replace(/:/g, '-').split('.')[0];
+    const dest = path.join(BACKUP_DIR, `backup-${timestamp}.db`);
+    try {
+        await db.backup(dest);
+        console.log(`💾 Backup creado: backup-${timestamp}.db`);
+        const files = fs.readdirSync(BACKUP_DIR)
+            .filter(f => f.endsWith('.db'))
+            .sort();
+        if (files.length > MAX_BACKUPS) {
+            const toDelete = files.slice(0, files.length - MAX_BACKUPS);
+            toDelete.forEach(f => fs.unlinkSync(path.join(BACKUP_DIR, f)));
+            console.log(`🗑️ Backups antiguos eliminados: ${toDelete.length}`);
+        }
+    } catch (e) {
+        console.error('Error al crear backup:', e.message);
+    }
+}
+
+// ============================================
 // API - Backup
 // ============================================
 
 app.get('/api/backup', (req, res) => {
-    const dbPath = path.join(__dirname, 'restaurant-stock.db');
+    const dbPath = process.env.DB_PATH || path.join(__dirname, 'restaurant-stock.db');
     const filename = `stock-backup-${new Date().toISOString().split('T')[0]}.db`;
     res.download(dbPath, filename);
+});
+
+app.get('/api/backups', (req, res) => {
+    try {
+        const files = fs.readdirSync(BACKUP_DIR)
+            .filter(f => f.endsWith('.db'))
+            .sort()
+            .reverse()
+            .map(f => {
+                const stat = fs.statSync(path.join(BACKUP_DIR, f));
+                return { name: f, size: stat.size, date: stat.mtime };
+            });
+        res.json(files);
+    } catch (e) {
+        res.json([]);
+    }
+});
+
+app.get('/api/backups/:filename', (req, res) => {
+    const file = path.basename(req.params.filename);
+    const filePath = path.join(BACKUP_DIR, file);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'No encontrado' });
+    res.download(filePath, file);
 });
 
 // ============================================
@@ -230,5 +284,12 @@ app.get('/api/backup', (req, res) => {
 
 app.listen(PORT, () => {
     console.log(`✅ Servidor iniciado en http://localhost:${PORT}`);
-    console.log(`📁 Base de datos: restaurant-stock.db`);
+    console.log(`📁 Base de datos: ${process.env.DB_PATH || 'restaurant-stock.db'}`);
+    console.log(`📂 Backups: ${BACKUP_DIR}`);
+
+    // Backup al iniciar
+    createBackup();
+
+    // Backup automático cada 24 horas
+    setInterval(createBackup, 24 * 60 * 60 * 1000);
 });
