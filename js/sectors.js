@@ -56,6 +56,7 @@ async function deleteCustomSector(id) {
         await loadAllHistory();
         refreshSectorUI();
         renderProducts();
+        renderPedidos();
         renderDailyStock();
         renderHistory();
     } catch (e) {

@@ -110,6 +110,7 @@ async function saveDailyStock() {
         await loadProducts();
         await loadAllHistory();
         renderProducts();
+        renderPedidos();
         renderDailyStock();
         renderHistory();
 
@@ -127,6 +128,7 @@ async function clearHistory() {
         await loadProducts();
         await loadAllHistory();
         renderProducts();
+        renderPedidos();
         renderDailyStock();
         renderHistory();
         alert('Historial eliminado.');

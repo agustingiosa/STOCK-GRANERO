@@ -44,6 +44,7 @@ async function addProduct(name, sector, unit, minStock, price) {
         await loadProducts();
         await populateHistoryProductFilter();
         renderProducts();
+        renderPedidos();
         renderDailyStock();
         return id;
     } catch (e) {
@@ -69,6 +70,7 @@ async function updateProduct(id, name, sector, unit, minStock, price) {
         await loadProducts();
         await populateHistoryProductFilter();
         renderProducts();
+        renderPedidos();
         renderDailyStock();
         return id;
     } catch (e) {
@@ -86,8 +88,10 @@ async function deleteProduct(id) {
         await loadAllHistory();
         await populateHistoryProductFilter();
         renderProducts();
+        renderPedidos();
         renderDailyStock();
         renderHistory();
+
     } catch (e) {
         console.error('Error al eliminar producto:', e);
         alert('Error al eliminar el producto.');
@@ -104,6 +108,95 @@ function editProduct(id) {
     document.getElementById('edit-min-stock').value = product.minStock;
     document.getElementById('edit-price').value = product.price || '';
     document.getElementById('edit-modal').classList.remove('hidden');
+}
+
+const collapsedPedidosSectors = new Set();
+
+function renderPedidos() {
+    const container = document.getElementById('pedidos-sectors-container');
+    const empty = document.getElementById('pedidos-empty-state');
+    const badge = document.getElementById('pedidos-count');
+
+    if (!container) return;
+
+    const needsOrder = products.filter(p =>
+        p.lastStock !== null && p.lastStock !== undefined && parseFloat(p.lastStock) <= parseFloat(p.minStock)
+    );
+
+    if (badge) badge.textContent = `${needsOrder.length} producto${needsOrder.length !== 1 ? 's' : ''}`;
+
+    if (needsOrder.length === 0) {
+        container.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+    }
+
+    empty.style.display = 'none';
+
+    const bySector = {};
+    needsOrder.forEach(product => {
+        if (!bySector[product.sector]) bySector[product.sector] = [];
+        bySector[product.sector].push(product);
+    });
+
+    let html = '';
+    Object.keys(bySector).forEach(sector => {
+        const label = getSectorLabel(sector);
+        const isCollapsed = collapsedPedidosSectors.has(sector);
+        const count = bySector[sector].length;
+
+        html += `<div class="daily-sector-group${isCollapsed ? ' collapsed' : ''}" data-sector="${sector}">
+            <div class="daily-sector-header">
+                <span>${label} <span class="badge" style="margin-left:8px;font-size:0.7rem;">${count}</span></span>
+                <span class="daily-sector-arrow">${isCollapsed ? '▶' : '▼'}</span>
+            </div>
+            <div class="daily-sector-body">
+                <div class="table-wrapper">
+                    <table>
+                        <thead><tr>
+                            <th>Producto</th>
+                            <th>Stock Actual</th>
+                            <th>Stock Mínimo</th>
+                            <th>Estado</th>
+                            <th>A reponer</th>
+                        </tr></thead>
+                        <tbody>`;
+
+        bySector[sector].forEach(product => {
+            const stock = parseFloat(product.lastStock);
+            const min = parseFloat(product.minStock);
+            const status = getStockStatus(stock, min);
+            const aReponer = Math.max(0, min - stock).toFixed(2);
+            const unit = getUnitLabel(product.unit);
+
+            html += `<tr>
+                <td><strong>${escapeHtml(product.name)}</strong></td>
+                <td>${stock.toFixed(2)} ${unit}</td>
+                <td>${min.toFixed(2)} ${unit}</td>
+                <td><span class="status-badge ${status.class}">${status.label}</span></td>
+                <td><strong>${aReponer} ${unit}</strong></td>
+            </tr>`;
+        });
+
+        html += `</tbody></table></div></div></div>`;
+    });
+
+    container.innerHTML = html;
+
+    container.querySelectorAll('.daily-sector-header').forEach(header => {
+        header.addEventListener('click', () => {
+            const group = header.closest('.daily-sector-group');
+            const sector = group.dataset.sector;
+            const arrow = header.querySelector('.daily-sector-arrow');
+            if (group.classList.toggle('collapsed')) {
+                collapsedPedidosSectors.add(sector);
+                arrow.textContent = '▶';
+            } else {
+                collapsedPedidosSectors.delete(sector);
+                arrow.textContent = '▼';
+            }
+        });
+    });
 }
 
 function renderProducts() {

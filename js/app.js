@@ -15,6 +15,7 @@ async function init() {
         await populateHistoryProductFilter();
         renderCustomSectorsList();
         renderProducts();
+        renderPedidos();
         renderDailyStock();
         renderHistory();
         setDailyDate('daily-date');

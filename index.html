@@ -19,6 +19,7 @@
             <!-- Pestañas -->
             <div class="tabs">
                 <button class="tab-btn active" data-tab="daily-stock">📋 Carga del Día</button>
+                <button class="tab-btn" data-tab="pedidos">🛒 Pedidos</button>
                 <button class="tab-btn" data-tab="products">📦 Productos</button>
                 <button class="tab-btn" data-tab="sectors">⚙️ Sectores</button>
                 <button class="tab-btn" data-tab="history">📊 Historial</button>
@@ -43,6 +44,22 @@
                 <div id="daily-empty-state" class="empty-state">
                     <p>📦 No hay productos registrados</p>
                     <p>Andá a la pestaña "Productos" para agregar productos primero.</p>
+                </div>
+            </section>
+
+            <!-- ==================== TAB: PEDIDOS ==================== -->
+            <section class="card tab-content" id="tab-pedidos">
+                <div class="section-header">
+                    <h2>🛒 Pedidos</h2>
+                    <span id="pedidos-count" class="badge">0 productos</span>
+                </div>
+                <div class="daily-stock-info">
+                    <p>Productos que están por debajo del stock mínimo y necesitan reposición.</p>
+                </div>
+                <div id="pedidos-sectors-container"></div>
+                <div id="pedidos-empty-state" class="empty-state">
+                    <p>✅ Todo en orden</p>
+                    <p>No hay productos con stock bajo en este momento.</p>
                 </div>
             </section>
 
