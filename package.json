@@ -4,8 +4,8 @@
   "description": "Control de stock para restaurante con base de datos SQLite local",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js"
+    "start": "node sync.js && node server.js",
+    "dev": "node sync.js && node server.js"
   },
   "dependencies": {
     "better-sqlite3": "^11.7.0",
