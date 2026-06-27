@@ -11,7 +11,7 @@ function getUnitLabel(value) {
         'kg': 'kg', 'g': 'g', 'l': 'l', 'ml': 'ml',
         'un': 'un', 'paq': 'paq', 'latas': 'latas',
         'botellas': 'botellas', 'porciones': 'porciones',
-        'planchas': 'planchas'
+        'planchas': 'planchas', 'bolsas': 'bolsas', 'cajas': 'cajas'
     };
     return labels[value] || value;
 }

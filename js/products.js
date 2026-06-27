@@ -133,7 +133,7 @@ function buildSectorOptions() {
 }
 
 function buildUnitOptions() {
-    const units = ['kg','g','l','ml','un','paq','latas','botellas','porciones','planchas'];
+    const units = ['kg','g','l','ml','un','paq','latas','botellas','porciones','planchas','bolsas','cajas'];
     return units.map(u => `<option value="${u}">${u}</option>`).join('');
 }
 
