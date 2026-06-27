@@ -68,6 +68,17 @@ db.exec(`
     CREATE INDEX IF NOT EXISTS idx_products_sector ON products(sector);
     CREATE INDEX IF NOT EXISTS idx_history_date ON stock_history(date);
     CREATE INDEX IF NOT EXISTS idx_history_product ON stock_history(product_id);
+
+    CREATE TABLE IF NOT EXISTS notification_config (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        phone TEXT DEFAULT '',
+        apikey TEXT DEFAULT '',
+        day_of_week TEXT DEFAULT 'everyday',
+        send_time TEXT DEFAULT '08:00',
+        enabled INTEGER DEFAULT 0,
+        last_sent TEXT DEFAULT ''
+    );
+    INSERT OR IGNORE INTO notification_config (id) VALUES (1);
 `);
 
 // ============================================
@@ -277,6 +288,124 @@ app.get('/api/backups/:filename', (req, res) => {
     if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'No encontrado' });
     res.download(filePath, file);
 });
+
+// ============================================
+// API - Notificaciones WhatsApp
+// ============================================
+
+const SECTOR_LABELS = {
+    'freezer-plancha': '🧊 Freezer de Plancha',
+    'freezer-freidora': '🧊 Freezer de Freidora',
+    'freezer-despacho': '🧊 Freezer de Despacho',
+    'freezer-postres': '🧊 Freezer de Postres',
+    'freezer-produccion': '🧊 Freezer de Producción',
+    'heladera-despacho': '🧊 Heladera de Despacho',
+    'heladera-plancha': '🧊 Heladera de Plancha',
+    'heladera-freidora': '🧊 Heladera de Freidora',
+    'heladera-sector-dulce': '🧊 Heladera Sector Dulce'
+};
+
+function getSectorName(sector) {
+    if (SECTOR_LABELS[sector]) return SECTOR_LABELS[sector];
+    return `📦 ${sector}`;
+}
+
+function buildStockMessage() {
+    const lowStock = db.prepare(`
+        SELECT * FROM products
+        WHERE last_stock IS NOT NULL AND last_stock <= min_stock
+        ORDER BY sector, name ASC
+    `).all();
+    if (lowStock.length === 0) return null;
+
+    const bySector = {};
+    lowStock.forEach(p => {
+        if (!bySector[p.sector]) bySector[p.sector] = [];
+        bySector[p.sector].push(p);
+    });
+
+    const date = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    let msg = `🛒 *PEDIDO DE STOCK - ${date}*\n`;
+    msg += `_Productos por debajo del stock mínimo_\n\n`;
+
+    Object.entries(bySector).forEach(([sector, prods]) => {
+        msg += `*${getSectorName(sector)}*\n`;
+        prods.forEach(p => {
+            const aReponer = Math.max(0, p.min_stock - p.last_stock).toFixed(2);
+            msg += `• ${p.name}: tiene ${parseFloat(p.last_stock).toFixed(2)} ${p.unit} — pedir ${aReponer} ${p.unit}\n`;
+        });
+        msg += '\n';
+    });
+
+    return msg.trim();
+}
+
+async function sendWhatsApp(phone, apikey, message) {
+    const url = `https://api.callmebot.com/whatsapp.php?phone=${phone}&text=${encodeURIComponent(message)}&apikey=${apikey}`;
+    try {
+        const res = await fetch(url);
+        const text = await res.text();
+        return { success: res.ok, response: text };
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
+}
+
+app.get('/api/notifications/config', (req, res) => {
+    try {
+        res.json(db.prepare('SELECT * FROM notification_config WHERE id = 1').get());
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/notifications/config', (req, res) => {
+    try {
+        const { phone, apikey, day_of_week, send_time, enabled } = req.body;
+        db.prepare(`UPDATE notification_config SET phone=?, apikey=?, day_of_week=?, send_time=?, enabled=? WHERE id=1`)
+            .run(phone || '', apikey || '', day_of_week || 'everyday', send_time || '08:00', enabled ? 1 : 0);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/notifications/test', async (req, res) => {
+    const config = db.prepare('SELECT * FROM notification_config WHERE id = 1').get();
+    if (!config.phone || !config.apikey) return res.status(400).json({ error: 'Falta teléfono o API key' });
+    const message = buildStockMessage() || '✅ No hay productos con stock bajo en este momento.';
+    const result = await sendWhatsApp(config.phone, config.apikey, message);
+    res.json(result);
+});
+
+// Scheduler: revisa cada minuto si hay que enviar
+setInterval(async () => {
+    const config = db.prepare('SELECT * FROM notification_config WHERE id = 1').get();
+    if (!config || !config.enabled || !config.phone || !config.apikey) return;
+
+    const now = new Date();
+    const currentDay = now.getDay().toString();
+    const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const currentKey = `${now.toISOString().split('T')[0]}_${currentTime}`;
+
+    const dayMatch = config.day_of_week === 'everyday' || config.day_of_week === currentDay;
+    if (!dayMatch || config.send_time !== currentTime || config.last_sent === currentKey) return;
+
+    const message = buildStockMessage();
+    if (!message) {
+        console.log('✅ Scheduler: no hay stock bajo, no se envía mensaje.');
+        db.prepare('UPDATE notification_config SET last_sent=? WHERE id=1').run(currentKey);
+        return;
+    }
+
+    const result = await sendWhatsApp(config.phone, config.apikey, message);
+    if (result.success) {
+        db.prepare('UPDATE notification_config SET last_sent=? WHERE id=1').run(currentKey);
+        console.log(`📱 WhatsApp enviado a ${config.phone}`);
+    } else {
+        console.error('Error enviando WhatsApp:', result.error || result.response);
+    }
+}, 60 * 1000);
 
 // ============================================
 // Iniciar servidor

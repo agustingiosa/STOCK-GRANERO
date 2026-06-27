@@ -19,6 +19,7 @@ async function init() {
         renderDailyStock();
         renderHistory();
         setDailyDate('daily-date');
+        await loadNotificationConfig();
     } catch (e) {
         console.error('Error al inicializar:', e);
         alert('Error al conectar con el servidor. Asegurate de que esté corriendo en http://localhost:3000');
@@ -166,6 +167,10 @@ document.getElementById('add-sector-btn').addEventListener('click', async () => 
 document.getElementById('new-sector-name').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { e.preventDefault(); document.getElementById('add-sector-btn').click(); }
 });
+
+// Notificaciones
+document.getElementById('notif-save-btn').addEventListener('click', saveNotificationConfig);
+document.getElementById('notif-test-btn').addEventListener('click', sendTestNotification);
 
 // ============================================
 // Exponer funciones globales para onclick en HTML
