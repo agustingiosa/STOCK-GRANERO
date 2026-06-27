@@ -69,6 +69,7 @@
                     <h2>📦 Productos</h2>
                     <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
                         <span id="product-count" class="badge">0 productos</span>
+                        <button id="open-bulk-modal" class="btn btn-secondary" style="width:auto; padding:8px 16px; font-size:0.85rem;">📋 Carga masiva</button>
                         <button id="open-add-product-modal" class="btn btn-primary" style="width:auto; padding:8px 16px; font-size:0.85rem;">➕ Nuevo</button>
                     </div>
                 </div>
@@ -199,6 +200,34 @@
                     <p>Cargá stock desde la pestaña "Carga del Día".</p>
                 </div>
             </section>
+
+            <!-- Modal carga masiva -->
+            <div id="bulk-modal" class="modal hidden">
+                <div class="modal-content" style="max-width:750px;">
+                    <span class="close-btn" id="close-bulk-modal">&times;</span>
+                    <h2>📋 Carga Masiva de Productos</h2>
+                    <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:16px;">Completá fila por fila. Presioná <strong>Enter</strong> en el último campo para agregar otra fila.</p>
+                    <div class="table-wrapper">
+                        <table id="bulk-table">
+                            <thead>
+                                <tr>
+                                    <th>Nombre</th>
+                                    <th>Sector</th>
+                                    <th>Unidad</th>
+                                    <th>Stock mínimo</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="bulk-body"></tbody>
+                        </table>
+                    </div>
+                    <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap;">
+                        <button id="bulk-add-row-btn" class="btn btn-secondary" style="width:auto;">➕ Agregar fila</button>
+                        <button id="bulk-save-btn" class="btn btn-primary" style="width:auto;flex:1;">💾 Guardar todos</button>
+                    </div>
+                    <p id="bulk-status" style="margin-top:10px;font-size:0.85rem;color:var(--text-secondary);"></p>
+                </div>
+            </div>
 
             <!-- Modal para agregar producto -->
             <div id="add-product-modal" class="modal hidden">

@@ -110,6 +110,103 @@ function editProduct(id) {
     document.getElementById('edit-modal').classList.remove('hidden');
 }
 
+// ============================================
+// Carga masiva
+// ============================================
+
+function buildSectorOptions() {
+    const fixed = [
+        { value: 'freezer-plancha', label: 'Freezer de Plancha' },
+        { value: 'freezer-freidora', label: 'Freezer de Freidora' },
+        { value: 'freezer-despacho', label: 'Freezer de Despacho' },
+        { value: 'freezer-postres', label: 'Freezer de Postres' },
+        { value: 'freezer-produccion', label: 'Freezer de Producción' },
+        { value: 'heladera-despacho', label: 'Heladera de Despacho' },
+        { value: 'heladera-plancha', label: 'Heladera de Plancha' },
+        { value: 'heladera-freidora', label: 'Heladera de Freidora' },
+        { value: 'heladera-sector-dulce', label: 'Heladera Sector Dulce' },
+    ];
+    const custom = customSectors.map(s => ({ value: s.name, label: s.name }));
+    return [...fixed, ...custom]
+        .map(s => `<option value="${s.value}">${s.label}</option>`)
+        .join('');
+}
+
+function buildUnitOptions() {
+    const units = ['kg','g','l','ml','un','paq','latas','botellas','porciones','planchas'];
+    return units.map(u => `<option value="${u}">${u}</option>`).join('');
+}
+
+function createBulkRow() {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td><input type="text" class="bulk-name" placeholder="Ej: Milanesas" style="width:100%;padding:7px 8px;background:var(--bg-input);border:1.5px solid var(--border-color);border-radius:var(--radius-sm);color:var(--text-primary);font-size:0.85rem;"></td>
+        <td><select class="bulk-sector" style="width:100%;padding:7px 8px;background:var(--bg-input);border:1.5px solid var(--border-color);border-radius:var(--radius-sm);color:var(--text-primary);font-size:0.85rem;">
+            <option value="">Seleccionar...</option>${buildSectorOptions()}
+        </select></td>
+        <td><select class="bulk-unit" style="width:100%;padding:7px 8px;background:var(--bg-input);border:1.5px solid var(--border-color);border-radius:var(--radius-sm);color:var(--text-primary);font-size:0.85rem;">
+            <option value="">...</option>${buildUnitOptions()}
+        </select></td>
+        <td><input type="number" class="bulk-min" placeholder="0" min="0" step="0.01" style="width:80px;padding:7px 8px;background:var(--bg-input);border:1.5px solid var(--border-color);border-radius:var(--radius-sm);color:var(--text-primary);font-size:0.85rem;"></td>
+        <td><button class="bulk-remove btn btn-delete" style="padding:4px 8px;font-size:0.75rem;">✕</button></td>
+    `;
+    // Eliminar fila
+    tr.querySelector('.bulk-remove').addEventListener('click', () => tr.remove());
+    // Enter en stock mínimo → nueva fila
+    tr.querySelector('.bulk-min').addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            document.getElementById('bulk-add-row-btn').click();
+            const rows = document.querySelectorAll('#bulk-body tr');
+            rows[rows.length - 1]?.querySelector('.bulk-name')?.focus();
+        }
+    });
+    return tr;
+}
+
+function openBulkModal() {
+    const body = document.getElementById('bulk-body');
+    body.innerHTML = '';
+    body.appendChild(createBulkRow());
+    document.getElementById('bulk-status').textContent = '';
+    document.getElementById('bulk-modal').classList.remove('hidden');
+    body.querySelector('.bulk-name')?.focus();
+}
+
+async function saveBulkProducts() {
+    const rows = document.querySelectorAll('#bulk-body tr');
+    const status = document.getElementById('bulk-status');
+    const toSave = [];
+
+    rows.forEach(row => {
+        const name = row.querySelector('.bulk-name').value.trim();
+        const sector = row.querySelector('.bulk-sector').value;
+        const unit = row.querySelector('.bulk-unit').value;
+        const min = row.querySelector('.bulk-min').value;
+        if (name && sector && unit && min !== '') toSave.push({ name, sector, unit, min });
+    });
+
+    if (toSave.length === 0) {
+        status.textContent = '⚠️ Completá al menos una fila con todos los campos.';
+        return;
+    }
+
+    status.textContent = `Guardando ${toSave.length} producto(s)...`;
+    document.getElementById('bulk-save-btn').disabled = true;
+
+    let saved = 0;
+    for (const p of toSave) {
+        const result = await addProduct(p.name, p.sector, p.unit, p.min, null);
+        if (result) saved++;
+    }
+
+    document.getElementById('bulk-save-btn').disabled = false;
+    status.textContent = `✅ ${saved} producto(s) guardados.`;
+    setTimeout(() => {
+        document.getElementById('bulk-modal').classList.add('hidden');
+    }, 1200);
+}
+
 const collapsedPedidosSectors = new Set();
 
 function renderPedidos() {

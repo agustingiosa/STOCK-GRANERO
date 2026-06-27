@@ -127,6 +127,13 @@ document.addEventListener('keydown', (e) => {
 // ============================================
 
 document.getElementById('save-daily-btn').addEventListener('click', saveDailyStock);
+
+// Carga masiva
+document.getElementById('open-bulk-modal').addEventListener('click', openBulkModal);
+document.getElementById('close-bulk-modal').addEventListener('click', () => document.getElementById('bulk-modal').classList.add('hidden'));
+document.getElementById('bulk-modal').addEventListener('click', e => { if (e.target === document.getElementById('bulk-modal')) document.getElementById('bulk-modal').classList.add('hidden'); });
+document.getElementById('bulk-add-row-btn').addEventListener('click', () => document.getElementById('bulk-body').appendChild(createBulkRow()));
+document.getElementById('bulk-save-btn').addEventListener('click', saveBulkProducts);
 document.getElementById('daily-search').addEventListener('input', renderDailyStock);
 
 // ============================================
