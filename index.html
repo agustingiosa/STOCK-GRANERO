@@ -167,18 +167,18 @@
                 <div style="margin-top:24px;">
                     <h3 style="font-size:0.95rem;color:var(--text-heading);margin-bottom:10px;font-weight:600;">📱 Notificación WhatsApp de stock bajo</h3>
                     <div class="daily-stock-info" style="margin-bottom:16px;">
-                        <p>Usamos <strong>CallMeBot</strong> (gratis). Para activarlo: agregá el número <strong>+34 644 69 74 70</strong> a tus contactos, mandales por WhatsApp <em>"I allow callmebot to send me messages"</em> y te van a responder con tu API key.</p>
+                        <p>Usamos <strong>CallMeBot</strong> (gratis). Cada número necesita su propia API key. Para activarla: agregá el número <strong>+34 644 69 74 70</strong> a los contactos, mandales <em>"I allow callmebot to send me messages"</em> y responden con la key.</p>
                     </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="notif-phone">Tu número (con código de país, sin +)</label>
-                            <input type="text" id="notif-phone" placeholder="Ej: 5491112345678">
+
+                    <!-- Destinatarios -->
+                    <div style="margin-bottom:16px;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                            <label style="font-size:0.8rem;font-weight:600;color:var(--text-label);">Destinatarios</label>
+                            <button id="notif-add-recipient-btn" class="btn btn-secondary" style="width:auto;padding:5px 12px;font-size:0.8rem;">➕ Agregar número</button>
                         </div>
-                        <div class="form-group">
-                            <label for="notif-apikey">API Key de CallMeBot</label>
-                            <input type="text" id="notif-apikey" placeholder="Ej: 123456">
-                        </div>
+                        <div id="recipients-list"></div>
                     </div>
+
                     <div class="form-row">
                         <div class="form-group">
                             <label for="notif-day">Día de envío</label>

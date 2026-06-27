@@ -79,6 +79,13 @@ db.exec(`
         last_sent TEXT DEFAULT ''
     );
     INSERT OR IGNORE INTO notification_config (id) VALUES (1);
+
+    CREATE TABLE IF NOT EXISTS notification_recipients (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        phone TEXT NOT NULL,
+        apikey TEXT NOT NULL
+    );
 `);
 
 // ============================================
@@ -371,27 +378,71 @@ app.get('/api/notifications/config', (req, res) => {
 
 app.post('/api/notifications/config', (req, res) => {
     try {
-        const { phone, apikey, day_of_week, send_time, enabled } = req.body;
-        db.prepare(`UPDATE notification_config SET phone=?, apikey=?, day_of_week=?, send_time=?, enabled=? WHERE id=1`)
-            .run(phone || '', apikey || '', day_of_week || 'everyday', send_time || '08:00', enabled ? 1 : 0);
+        const { day_of_week, send_time, enabled } = req.body;
+        db.prepare(`UPDATE notification_config SET day_of_week=?, send_time=?, enabled=? WHERE id=1`)
+            .run(day_of_week || 'everyday', send_time || '08:00', enabled ? 1 : 0);
         res.json({ success: true });
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
 });
 
+// Destinatarios
+app.get('/api/notifications/recipients', (req, res) => {
+    try {
+        res.json(db.prepare('SELECT * FROM notification_recipients ORDER BY name ASC').all());
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/notifications/recipients', (req, res) => {
+    try {
+        const { id, name, phone, apikey } = req.body;
+        db.prepare('INSERT INTO notification_recipients (id, name, phone, apikey) VALUES (?, ?, ?, ?)')
+            .run(id, name.trim(), phone.trim(), apikey.trim());
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.delete('/api/notifications/recipients/:id', (req, res) => {
+    try {
+        db.prepare('DELETE FROM notification_recipients WHERE id = ?').run(req.params.id);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+async function sendToAllRecipients(message) {
+    const recipients = db.prepare('SELECT * FROM notification_recipients').all();
+    if (recipients.length === 0) return { sent: 0, errors: 0 };
+    let sent = 0, errors = 0;
+    for (const r of recipients) {
+        const result = await sendWhatsApp(r.phone, r.apikey, message);
+        if (result.success) { sent++; console.log(`📱 WhatsApp enviado a ${r.name} (${r.phone})`); }
+        else { errors++; console.error(`Error enviando a ${r.name}:`, result.error || result.response); }
+    }
+    return { sent, errors };
+}
+
 app.post('/api/notifications/test', async (req, res) => {
-    const config = db.prepare('SELECT * FROM notification_config WHERE id = 1').get();
-    if (!config.phone || !config.apikey) return res.status(400).json({ error: 'Falta teléfono o API key' });
+    const recipients = db.prepare('SELECT * FROM notification_recipients').all();
+    if (recipients.length === 0) return res.status(400).json({ error: 'No hay destinatarios configurados.' });
     const message = buildStockMessage() || '✅ No hay productos con stock bajo en este momento.';
-    const result = await sendWhatsApp(config.phone, config.apikey, message);
-    res.json(result);
+    const result = await sendToAllRecipients(message);
+    res.json({ success: true, ...result });
 });
 
 // Scheduler: revisa cada minuto si hay que enviar
 setInterval(async () => {
     const config = db.prepare('SELECT * FROM notification_config WHERE id = 1').get();
-    if (!config || !config.enabled || !config.phone || !config.apikey) return;
+    if (!config || !config.enabled) return;
+
+    const recipients = db.prepare('SELECT * FROM notification_recipients').all();
+    if (recipients.length === 0) return;
 
     const now = new Date();
     const currentDay = now.getDay().toString();
@@ -403,18 +454,12 @@ setInterval(async () => {
 
     const message = buildStockMessage();
     if (!message) {
-        console.log('✅ Scheduler: no hay stock bajo, no se envía mensaje.');
         db.prepare('UPDATE notification_config SET last_sent=? WHERE id=1').run(currentKey);
         return;
     }
 
-    const result = await sendWhatsApp(config.phone, config.apikey, message);
-    if (result.success) {
-        db.prepare('UPDATE notification_config SET last_sent=? WHERE id=1').run(currentKey);
-        console.log(`📱 WhatsApp enviado a ${config.phone}`);
-    } else {
-        console.error('Error enviando WhatsApp:', result.error || result.response);
-    }
+    const { sent } = await sendToAllRecipients(message);
+    if (sent > 0) db.prepare('UPDATE notification_config SET last_sent=? WHERE id=1').run(currentKey);
 }, 60 * 1000);
 
 // ============================================

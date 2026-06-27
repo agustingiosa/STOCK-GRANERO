@@ -170,6 +170,7 @@ document.getElementById('new-sector-name').addEventListener('keydown', (e) => {
 
 // Notificaciones y configuración
 document.getElementById('create-backup-btn').addEventListener('click', createManualBackup);
+document.getElementById('notif-add-recipient-btn').addEventListener('click', openAddRecipientModal);
 document.getElementById('notif-save-btn').addEventListener('click', saveNotificationConfig);
 document.getElementById('notif-test-btn').addEventListener('click', sendTestNotification);
 
