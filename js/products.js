@@ -374,7 +374,7 @@ function renderProducts() {
                 <td>${getSectorLabel(product.sector)}</td>
                 <td>${getUnitLabel(product.unit)}</td>
                 <td>${parseFloat(product.minStock).toFixed(2)}</td>
-                <td>${lastStockDisplay}</td>
+                <td class="${product.lastStock !== null ? getStockColorClass(product.lastStock, product.minStock) : ''}">${lastStockDisplay}</td>
                 <td>${lastDateDisplay}</td>
                 <td><span class="status-badge ${status.class}">${status.label}</span></td>
                 <td>
