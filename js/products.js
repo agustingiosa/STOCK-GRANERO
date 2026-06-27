@@ -137,23 +137,26 @@ function buildUnitOptions() {
     return units.map(u => `<option value="${u}">${u}</option>`).join('');
 }
 
+const BULK_INPUT_STYLE = 'width:100%;padding:7px 8px;background:var(--bg-input);border:1.5px solid var(--border-color);border-radius:var(--radius-sm);color:var(--text-primary);font-size:0.85rem;';
+const BULK_NUM_STYLE = 'width:80px;padding:7px 8px;background:var(--bg-input);border:1.5px solid var(--border-color);border-radius:var(--radius-sm);color:var(--text-primary);font-size:0.85rem;';
+
 function createBulkRow() {
     const tr = document.createElement('tr');
     tr.innerHTML = `
-        <td><input type="text" class="bulk-name" placeholder="Ej: Milanesas" style="width:100%;padding:7px 8px;background:var(--bg-input);border:1.5px solid var(--border-color);border-radius:var(--radius-sm);color:var(--text-primary);font-size:0.85rem;"></td>
-        <td><select class="bulk-sector" style="width:100%;padding:7px 8px;background:var(--bg-input);border:1.5px solid var(--border-color);border-radius:var(--radius-sm);color:var(--text-primary);font-size:0.85rem;">
+        <td><input type="text" class="bulk-name" placeholder="Ej: Milanesas" style="${BULK_INPUT_STYLE}"></td>
+        <td><select class="bulk-sector" style="${BULK_INPUT_STYLE}">
             <option value="">Seleccionar...</option>${buildSectorOptions()}
         </select></td>
-        <td><select class="bulk-unit" style="width:100%;padding:7px 8px;background:var(--bg-input);border:1.5px solid var(--border-color);border-radius:var(--radius-sm);color:var(--text-primary);font-size:0.85rem;">
+        <td><select class="bulk-unit" style="${BULK_INPUT_STYLE}">
             <option value="">...</option>${buildUnitOptions()}
         </select></td>
-        <td><input type="number" class="bulk-min" placeholder="0" min="0" step="0.01" style="width:80px;padding:7px 8px;background:var(--bg-input);border:1.5px solid var(--border-color);border-radius:var(--radius-sm);color:var(--text-primary);font-size:0.85rem;"></td>
+        <td><input type="number" class="bulk-min" placeholder="0" min="0" step="0.01" style="${BULK_NUM_STYLE}"></td>
+        <td><input type="number" class="bulk-stock" placeholder="-" min="0" step="0.01" style="${BULK_NUM_STYLE}"></td>
         <td><button class="bulk-remove btn btn-delete" style="padding:4px 8px;font-size:0.75rem;">✕</button></td>
     `;
-    // Eliminar fila
     tr.querySelector('.bulk-remove').addEventListener('click', () => tr.remove());
-    // Enter en stock mínimo → nueva fila
-    tr.querySelector('.bulk-min').addEventListener('keydown', e => {
+    // Enter en stock actual → nueva fila
+    tr.querySelector('.bulk-stock').addEventListener('keydown', e => {
         if (e.key === 'Enter') {
             e.preventDefault();
             document.getElementById('bulk-add-row-btn').click();
@@ -183,7 +186,8 @@ async function saveBulkProducts() {
         const sector = row.querySelector('.bulk-sector').value;
         const unit = row.querySelector('.bulk-unit').value;
         const min = row.querySelector('.bulk-min').value;
-        if (name && sector && unit && min !== '') toSave.push({ name, sector, unit, min });
+        const stock = row.querySelector('.bulk-stock').value;
+        if (name && sector && unit && min !== '') toSave.push({ name, sector, unit, min, stock });
     });
 
     if (toSave.length === 0) {
@@ -194,17 +198,49 @@ async function saveBulkProducts() {
     status.textContent = `Guardando ${toSave.length} producto(s)...`;
     document.getElementById('bulk-save-btn').disabled = true;
 
-    let saved = 0;
+    const now = new Date().toISOString();
+    const todayKey = getTodayKey();
+    const stockEntries = [];
+
     for (const p of toSave) {
-        const result = await addProduct(p.name, p.sector, p.unit, p.min, null);
-        if (result) saved++;
+        const id = generateId();
+        await apiAddProduct({
+            id,
+            name: p.name.trim(),
+            sector: p.sector,
+            unit: p.unit,
+            min_stock: parseFloat(p.min) || 0,
+            price: null,
+            created_at: now
+        });
+        if (p.stock !== '') {
+            stockEntries.push({
+                id: generateId(),
+                product_id: id,
+                product_name: p.name.trim(),
+                sector: p.sector,
+                unit: p.unit,
+                stock: parseFloat(p.stock),
+                created_at: now
+            });
+        }
     }
 
+    if (stockEntries.length > 0) {
+        await apiSaveDailyStock(todayKey, stockEntries);
+    }
+
+    await loadProducts();
+    await loadAllHistory();
+    await populateHistoryProductFilter();
+    renderProducts();
+    renderPedidos();
+    renderDailyStock();
+    renderHistory();
+
     document.getElementById('bulk-save-btn').disabled = false;
-    status.textContent = `✅ ${saved} producto(s) guardados.`;
-    setTimeout(() => {
-        document.getElementById('bulk-modal').classList.add('hidden');
-    }, 1200);
+    status.textContent = `✅ ${toSave.length} producto(s) guardados${stockEntries.length > 0 ? ` con stock de ${stockEntries.length}` : ''}.`;
+    setTimeout(() => document.getElementById('bulk-modal').classList.add('hidden'), 1500);
 }
 
 const collapsedPedidosSectors = new Set();
