@@ -196,13 +196,17 @@ function renderDailyStock() {
             const todayEntry = todayHistory.find(h => h.productId === product.id);
             const lastEntry = getLastStockForProduct(product.id);
             const previousStock = lastEntry ? lastEntry.stock : null;
+            const minStock = parseFloat(product.minStock);
 
-            html += `<tr data-product-id="${product.id}">
+            const prevClass = previousStock !== null ? getStockColorClass(previousStock, minStock) : '';
+            const todayClass = todayEntry ? getStockColorClass(todayEntry.stock, minStock) : '';
+
+            html += `<tr data-product-id="${product.id}" data-min-stock="${minStock}">
                 <td><strong>${escapeHtml(product.name)}</strong></td>
                 <td>${getUnitLabel(product.unit)}</td>
-                <td>${parseFloat(product.minStock).toFixed(2)}</td>
-                <td>${previousStock !== null ? parseFloat(previousStock).toFixed(2) : '-'}</td>
-                <td><input type="number" class="daily-stock-input" min="0" step="0.01"
+                <td>${minStock.toFixed(2)}</td>
+                <td class="${prevClass}">${previousStock !== null ? parseFloat(previousStock).toFixed(2) : '-'}</td>
+                <td><input type="number" class="daily-stock-input ${todayClass}" min="0" step="0.01"
                            placeholder="Stock hoy..."
                            value="${todayEntry ? todayEntry.stock : ''}"></td>
             </tr>`;
@@ -212,6 +216,17 @@ function renderDailyStock() {
     });
 
     container.innerHTML = html;
+
+    container.querySelectorAll('.daily-stock-input').forEach(input => {
+        input.addEventListener('input', () => {
+            const minStock = parseFloat(input.closest('tr').dataset.minStock);
+            const val = parseFloat(input.value);
+            input.classList.remove('stock-ok', 'stock-warning', 'stock-critical');
+            if (!isNaN(val) && input.value !== '') {
+                input.classList.add(getStockColorClass(val, minStock));
+            }
+        });
+    });
 
     container.querySelectorAll('.daily-sector-header').forEach(header => {
         header.addEventListener('click', () => {

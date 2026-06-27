@@ -456,6 +456,36 @@ header .subtitle {
     margin-bottom: 0;
 }
 
+/* Stock color indicators */
+.stock-critical {
+    color: #ff6b6b;
+    font-weight: 700;
+}
+.stock-warning {
+    color: #ffa94d;
+    font-weight: 600;
+}
+.stock-ok {
+    color: #69db7c;
+    font-weight: 600;
+}
+
+input.stock-critical {
+    border-color: #ff6b6b !important;
+    background: rgba(255, 107, 107, 0.08) !important;
+    color: #ff6b6b;
+}
+input.stock-warning {
+    border-color: #ffa94d !important;
+    background: rgba(255, 169, 77, 0.08) !important;
+    color: #ffa94d;
+}
+input.stock-ok {
+    border-color: #69db7c !important;
+    background: rgba(105, 219, 124, 0.08) !important;
+    color: #69db7c;
+}
+
 .daily-stock-info {
     background: var(--bg-info);
     border: 1px solid var(--border-info);

@@ -25,6 +25,13 @@ function getStockStatus(stock, minStock) {
     return { class: 'status-overstock', label: 'Excedente' };
 }
 
+function getStockColorClass(stock, minStock) {
+    if (isNaN(stock) || minStock === 0) return '';
+    if (stock <= minStock) return 'stock-critical';
+    if (stock <= minStock * 1.5) return 'stock-warning';
+    return 'stock-ok';
+}
+
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
