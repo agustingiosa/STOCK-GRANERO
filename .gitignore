@@ -1,7 +1,9 @@
 node_modules/
+functions/node_modules/
 *.db
 *.db-shm
 *.db-wal
 .env
 !.env.example
 backups/
+.firebase/

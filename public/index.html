@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control de Stock - Restaurante</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <!-- La base de datos SQLite se maneja desde el servidor Node.js (server.js) -->
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Control de Stock</h1>
+            <p class="subtitle"></p>
+        </header>
+
+        <main>
+            <!-- Pestañas -->
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="daily-stock">📋 Carga del Día</button>
+                <button class="tab-btn" data-tab="pedidos">🛒 Pedidos</button>
+                <button class="tab-btn" data-tab="products">📦 Productos</button>
+                <button class="tab-btn" data-tab="sectors">⚙️ Sectores</button>
+                <button class="tab-btn" data-tab="history">📊 Historial</button>
+                <button class="tab-btn" data-tab="config">🔧 Configuración</button>
+            </div>
+
+            <!-- ==================== TAB: CARGA DEL DÍA ==================== -->
+            <section class="card tab-content active" id="tab-daily-stock">
+                <div class="section-header">
+                    <h2>📋 Carga de Stock - <span id="daily-date"></span></h2>
+                    <button id="save-daily-btn" class="btn btn-primary" style="width:auto">💾 Guardar carga del día</button>
+                </div>
+
+                <div class="daily-stock-info">
+                    <p>Ingresá el stock actual de cada producto. Solo completá los que hayas medido hoy.</p>
+                </div>
+
+                <div class="search-box" style="margin-bottom:16px;">
+                    <input type="text" id="daily-search" placeholder="🔍 Buscar producto...">
+                </div>
+
+                <div id="daily-sectors-container"></div>
+                <div id="daily-empty-state" class="empty-state">
+                    <p>📦 No hay productos registrados</p>
+                    <p>Andá a la pestaña "Productos" para agregar productos primero.</p>
+                </div>
+            </section>
+
+            <!-- ==================== TAB: PEDIDOS ==================== -->
+            <section class="card tab-content" id="tab-pedidos">
+                <div class="section-header">
+                    <h2>🛒 Pedidos</h2>
+                    <span id="pedidos-count" class="badge">0 productos</span>
+                </div>
+                <div class="daily-stock-info">
+                    <p>Productos que están por debajo del stock mínimo y necesitan reposición.</p>
+                </div>
+                <div id="pedidos-sectors-container"></div>
+                <div id="pedidos-empty-state" class="empty-state">
+                    <p>✅ Todo en orden</p>
+                    <p>No hay productos con stock bajo en este momento.</p>
+                </div>
+            </section>
+
+            <!-- ==================== TAB: PRODUCTOS ==================== -->
+            <section class="card tab-content" id="tab-products">
+                <div class="section-header">
+                    <h2>📦 Productos</h2>
+                    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                        <span id="product-count" class="badge">0 productos</span>
+                        <button id="open-bulk-modal" class="btn btn-secondary" style="width:auto; padding:8px 16px; font-size:0.85rem;">📋 Carga masiva</button>
+                        <button id="open-add-product-modal" class="btn btn-primary" style="width:auto; padding:8px 16px; font-size:0.85rem;">➕ Nuevo</button>
+                    </div>
+                </div>
+
+                <div class="filters-row" style="margin-bottom:16px;">
+                    <div class="search-box">
+                        <input type="text" id="search-input" placeholder="🔍 Buscar producto...">
+                    </div>
+                    <div class="filter-group">
+                        <select id="sector-filter">
+                            <option value="todos">Todos los sectores</option>
+                            <optgroup label="🧊 Freezer">
+                                <option value="freezer-plancha">Freezer de Plancha</option>
+                                <option value="freezer-freidora">Freezer de Freidora</option>
+                                <option value="freezer-despacho">Freezer de Despacho</option>
+                                <option value="freezer-postres">Freezer de Postres</option>
+                                <option value="freezer-produccion">Freezer de Producción</option>
+                            </optgroup>
+                            <optgroup label="🧊 Heladera">
+                                <option value="heladera-despacho">Heladera de Despacho</option>
+                                <option value="heladera-plancha">Heladera de Plancha</option>
+                                <option value="heladera-freidora">Heladera de Freidora</option>
+                                <option value="heladera-sector-dulce">Heladera de Sector Dulce</option>
+                            </optgroup>
+                            <optgroup label="📦 Otros" id="filter-custom-sectors-group"></optgroup>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="table-wrapper">
+                    <table id="inventory-table">
+                        <thead>
+                            <tr>
+                                <th>Producto</th>
+                                <th>Sector</th>
+                                <th>Unidad</th>
+                                <th>Stock Mínimo</th>
+                                <th>Último Stock</th>
+                                <th>Última Carga</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventory-body"></tbody>
+                    </table>
+                </div>
+                <div id="empty-state" class="empty-state">
+                    <p>📦 No hay productos registrados</p>
+                    <p>Agregá tu primer producto usando el formulario de arriba.</p>
+                </div>
+            </section>
+
+            <!-- ==================== TAB: SECTORES ==================== -->
+            <section class="card tab-content" id="tab-sectors">
+                <h2>⚙️ Gestionar Sectores Personalizados</h2>
+                <div class="add-sector-row">
+                    <div class="form-group">
+                        <label for="new-sector-name">Nombre del nuevo sector</label>
+                        <input type="text" id="new-sector-name" placeholder="Ej: Freezer de pan, Heladera de bebidas...">
+                    </div>
+                    <div class="form-group">
+                        <label for="new-sector-type">Tipo</label>
+                        <select id="new-sector-type">
+                            <option value="freezer">🧊 Freezer</option>
+                            <option value="heladera">🧊 Heladera</option>
+                            <option value="otros">📦 Otro</option>
+                        </select>
+                    </div>
+                    <div class="form-group add-sector-btn-group">
+                        <label>&nbsp;</label>
+                        <button id="add-sector-btn" class="btn btn-secondary">➕ Agregar Sector</button>
+                    </div>
+                </div>
+                <div id="custom-sectors-list" class="sectors-list"></div>
+            </section>
+
+            <!-- ==================== TAB: CONFIGURACIÓN ==================== -->
+            <section class="card tab-content" id="tab-config">
+                <h2>🔧 Configuración</h2>
+
+                <!-- Backup -->
+                <div style="margin-bottom:24px;">
+                    <h3 style="font-size:0.95rem;color:var(--text-heading);margin-bottom:10px;font-weight:600;">💾 Base de datos</h3>
+                    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                        <button id="create-backup-btn" class="btn btn-secondary" style="width:auto;">📦 Crear backup</button>
+                        <a href="/api/backup" class="btn btn-secondary" style="width:auto;text-decoration:none;display:inline-flex;">⬇️ Descargar backup</a>
+                        <span id="backup-status" style="font-size:0.85rem;color:var(--text-secondary);"></span>
+                    </div>
+                </div>
+
+                <hr>
+
+                <!-- WhatsApp -->
+                <div style="margin-top:24px;">
+                    <h3 style="font-size:0.95rem;color:var(--text-heading);margin-bottom:10px;font-weight:600;">📱 Notificación WhatsApp de stock bajo</h3>
+                    <div class="daily-stock-info" style="margin-bottom:16px;">
+                        <p>Usamos <strong>CallMeBot</strong> (gratis). Cada número necesita su propia API key. Para activarla: agregá el número <strong>+34 644 69 74 70</strong> a los contactos, mandales <em>"I allow callmebot to send me messages"</em> y responden con la key.</p>
+                    </div>
+
+                    <!-- Destinatarios -->
+                    <div style="margin-bottom:16px;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                            <label style="font-size:0.8rem;font-weight:600;color:var(--text-label);">Destinatarios</label>
+                            <button id="notif-add-recipient-btn" class="btn btn-secondary" style="width:auto;padding:5px 12px;font-size:0.8rem;">➕ Agregar número</button>
+                        </div>
+                        <div id="recipients-list"></div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="notif-day">Día de envío</label>
+                            <select id="notif-day">
+                                <option value="everyday">Todos los días</option>
+                                <option value="1">Lunes</option>
+                                <option value="2">Martes</option>
+                                <option value="3">Miércoles</option>
+                                <option value="4">Jueves</option>
+                                <option value="5">Viernes</option>
+                                <option value="6">Sábado</option>
+                                <option value="0">Domingo</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="notif-time">Horario de envío</label>
+                            <input type="time" id="notif-time" value="08:00">
+                        </div>
+                        <div class="form-group" style="display:flex;align-items:flex-end;">
+                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding-bottom:10px;">
+                                <input type="checkbox" id="notif-enabled" style="width:18px;height:18px;cursor:pointer;">
+                                Activar aviso
+                            </label>
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                        <button id="notif-save-btn" class="btn btn-primary" style="width:auto;">💾 Guardar configuración</button>
+                        <button id="notif-test-btn" class="btn btn-secondary" style="width:auto;">📤 Enviar prueba ahora</button>
+                    </div>
+                    <p id="notif-status" style="margin-top:10px;font-size:0.85rem;"></p>
+                </div>
+            </section>
+
+            <!-- ==================== TAB: HISTORIAL ==================== -->
+            <section class="card tab-content" id="tab-history">
+                <div class="section-header">
+                    <h2>📊 Historial de Cargas</h2>
+                    <button id="clear-history-btn" class="btn btn-delete" style="padding:8px 16px;">🗑️ Limpiar historial</button>
+                </div>
+
+                <div class="filters-row" style="margin-bottom:16px;">
+                    <div class="form-group" style="min-width:200px;">
+                        <label for="history-date-from">Desde</label>
+                        <input type="date" id="history-date-from">
+                    </div>
+                    <div class="form-group" style="min-width:200px;">
+                        <label for="history-date-to">Hasta</label>
+                        <input type="date" id="history-date-to">
+                    </div>
+                    <div class="form-group" style="min-width:200px;">
+                        <label for="history-product-filter">Producto</label>
+                        <select id="history-product-filter">
+                            <option value="todos">Todos los productos</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Gráfico de evolución de stock -->
+                <div id="chart-container" class="chart-container" style="margin-bottom:20px;">
+                    <h3 style="font-size:0.9rem; color:var(--text-secondary); margin-bottom:10px;">📈 Evolución de Stock</h3>
+                    <div class="chart-wrapper">
+                        <canvas id="stock-chart"></canvas>
+                    </div>
+                </div>
+
+                <div class="table-wrapper">
+                    <table id="history-table">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Producto</th>
+                                <th>Sector</th>
+                                <th>Stock</th>
+                                <th>Unidad</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-body"></tbody>
+                    </table>
+                </div>
+                <div id="history-empty-state" class="empty-state">
+                    <p>📊 No hay cargas registradas</p>
+                    <p>Cargá stock desde la pestaña "Carga del Día".</p>
+                </div>
+            </section>
+
+            <!-- Modal carga masiva -->
+            <div id="bulk-modal" class="modal hidden">
+                <div class="modal-content" style="max-width:750px;">
+                    <span class="close-btn" id="close-bulk-modal">&times;</span>
+                    <h2>📋 Carga Masiva de Productos</h2>
+                    <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:16px;">Completá fila por fila. Presioná <strong>Enter</strong> en el último campo para agregar otra fila.</p>
+                    <div class="table-wrapper">
+                        <table id="bulk-table">
+                            <thead>
+                                <tr>
+                                    <th>Nombre</th>
+                                    <th>Sector</th>
+                                    <th>Unidad</th>
+                                    <th>Stock mínimo</th>
+                                    <th>Stock actual</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="bulk-body"></tbody>
+                        </table>
+                    </div>
+                    <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap;">
+                        <button id="bulk-add-row-btn" class="btn btn-secondary" style="width:auto;">➕ Agregar fila</button>
+                        <button id="bulk-save-btn" class="btn btn-primary" style="width:auto;flex:1;">💾 Guardar todos</button>
+                    </div>
+                    <p id="bulk-status" style="margin-top:10px;font-size:0.85rem;color:var(--text-secondary);"></p>
+                </div>
+            </div>
+
+            <!-- Modal para agregar producto -->
+            <div id="add-product-modal" class="modal hidden">
+                <div class="modal-content">
+                    <span class="close-btn" id="close-add-modal">&times;</span>
+                    <h2>➕ Nuevo Producto</h2>
+                    <form id="add-product-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="ap-name">Nombre del producto</label>
+                                <input type="text" id="ap-name" placeholder="Ej: Papas, Milanesas, Crema..." required>
+                            </div>
+                            <div class="form-group">
+                                <label for="ap-sector">Sector</label>
+                                <select id="ap-sector" required>
+                                    <option value="">Seleccionar...</option>
+                                    <optgroup label="🧊 Freezer">
+                                        <option value="freezer-plancha">Freezer de Plancha</option>
+                                        <option value="freezer-freidora">Freezer de Freidora</option>
+                                        <option value="freezer-despacho">Freezer de Despacho</option>
+                                        <option value="freezer-postres">Freezer de Postres</option>
+                                        <option value="freezer-produccion">Freezer de Producción</option>
+                                    </optgroup>
+                                    <optgroup label="🧊 Heladera">
+                                        <option value="heladera-despacho">Heladera de Despacho</option>
+                                        <option value="heladera-plancha">Heladera de Plancha</option>
+                                        <option value="heladera-freidora">Heladera de Freidora</option>
+                                        <option value="heladera-sector-dulce">Heladera de Sector Dulce</option>
+                                    </optgroup>
+                                    <optgroup label="📦 Otros" id="ap-custom-sectors-group"></optgroup>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="ap-unit">Unidad de medida</label>
+                                <select id="ap-unit" required>
+                                    <option value="">Seleccionar...</option>
+                                    <option value="kg">Kilogramos (kg)</option>
+                                    <option value="g">Gramos (g)</option>
+                                    <option value="l">Litros (l)</option>
+                                    <option value="ml">Mililitros (ml)</option>
+                                    <option value="un">Unidades</option>
+                                    <option value="paq">Paquetes</option>
+                                    <option value="latas">Latas</option>
+                                    <option value="botellas">Botellas</option>
+                                    <option value="porciones">Porciones</option>
+                                    <option value="planchas">Planchas</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="ap-min-stock">Stock mínimo (alerta)</label>
+                                <input type="number" id="ap-min-stock" placeholder="0" min="0" step="0.01" required>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="ap-price">Precio unitario ($) - opcional</label>
+                                <input type="number" id="ap-price" placeholder="0.00" min="0" step="0.01">
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary">💾 Guardar Producto</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Modal para editar producto -->
+            <div id="edit-modal" class="modal hidden">
+                <div class="modal-content">
+                    <span class="close-btn" id="close-modal">&times;</span>
+                    <h2>Editar Producto</h2>
+                    <form id="edit-form">
+                        <input type="hidden" id="edit-id">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="edit-name">Nombre del producto</label>
+                                <input type="text" id="edit-name" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="edit-sector">Sector</label>
+                                <select id="edit-sector" required>
+                                    <optgroup label="🧊 Freezer">
+                                        <option value="freezer-plancha">Freezer de Plancha</option>
+                                        <option value="freezer-freidora">Freezer de Freidora</option>
+                                        <option value="freezer-despacho">Freezer de Despacho</option>
+                                        <option value="freezer-postres">Freezer de Postres</option>
+                                        <option value="freezer-produccion">Freezer de Producción</option>
+                                    </optgroup>
+                                    <optgroup label="🧊 Heladera">
+                                        <option value="heladera-despacho">Heladera de Despacho</option>
+                                        <option value="heladera-plancha">Heladera de Plancha</option>
+                                        <option value="heladera-freidora">Heladera de Freidora</option>
+                                        <option value="heladera-sector-dulce">Heladera de Sector Dulce</option>
+                                    </optgroup>
+                                    <optgroup label="📦 Otros" id="edit-custom-sectors-group"></optgroup>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="edit-unit">Unidad de medida</label>
+                                <select id="edit-unit" required>
+                                    <option value="kg">Kilogramos (kg)</option>
+                                    <option value="g">Gramos (g)</option>
+                                    <option value="l">Litros (l)</option>
+                                    <option value="ml">Mililitros (ml)</option>
+                                    <option value="un">Unidades</option>
+                                    <option value="paq">Paquetes</option>
+                                    <option value="latas">Latas</option>
+                                    <option value="botellas">Botellas</option>
+                                    <option value="porciones">Porciones</option>
+                                    <option value="planchas">Planchas</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="edit-min-stock">Stock mínimo (alerta)</label>
+                                <input type="number" id="edit-min-stock" min="0" step="0.01" required>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="edit-price">Precio unitario ($)</label>
+                                <input type="number" id="edit-price" min="0" step="0.01">
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                    </form>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>Control de Stock - Restaurante &copy; 2026</p>
+        </footer>
+    </div>
+
+    <script src="js/database.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/sectors.js"></script>
+    <script src="js/products.js"></script>
+    <script src="js/history.js"></script>
+    <script src="js/notifications.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
