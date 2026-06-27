@@ -168,7 +168,8 @@ document.getElementById('new-sector-name').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { e.preventDefault(); document.getElementById('add-sector-btn').click(); }
 });
 
-// Notificaciones
+// Notificaciones y configuración
+document.getElementById('create-backup-btn').addEventListener('click', createManualBackup);
 document.getElementById('notif-save-btn').addEventListener('click', saveNotificationConfig);
 document.getElementById('notif-test-btn').addEventListener('click', sendTestNotification);
 

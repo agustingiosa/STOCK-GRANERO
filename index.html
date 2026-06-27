@@ -154,7 +154,11 @@
                 <!-- Backup -->
                 <div style="margin-bottom:24px;">
                     <h3 style="font-size:0.95rem;color:var(--text-heading);margin-bottom:10px;font-weight:600;">💾 Base de datos</h3>
-                    <a href="/api/backup" class="btn btn-secondary" style="width:auto;text-decoration:none;display:inline-flex;">⬇️ Descargar backup</a>
+                    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                        <button id="create-backup-btn" class="btn btn-secondary" style="width:auto;">📦 Crear backup</button>
+                        <a href="/api/backup" class="btn btn-secondary" style="width:auto;text-decoration:none;display:inline-flex;">⬇️ Descargar backup</a>
+                        <span id="backup-status" style="font-size:0.85rem;color:var(--text-secondary);"></span>
+                    </div>
                 </div>
 
                 <hr>

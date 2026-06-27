@@ -266,6 +266,16 @@ app.get('/api/backup', (req, res) => {
     res.download(dbPath, filename);
 });
 
+app.post('/api/backups/create', async (req, res) => {
+    try {
+        await createBackup();
+        const files = fs.readdirSync(BACKUP_DIR).filter(f => f.endsWith('.db')).sort();
+        res.json({ success: true, file: files[files.length - 1] });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 app.get('/api/backups', (req, res) => {
     try {
         const files = fs.readdirSync(BACKUP_DIR)

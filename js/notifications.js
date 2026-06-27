@@ -2,6 +2,29 @@
 // notifications.js - Configuración de alertas WhatsApp
 // ============================================
 
+async function createManualBackup() {
+    const status = document.getElementById('backup-status');
+    const btn = document.getElementById('create-backup-btn');
+    btn.disabled = true;
+    status.textContent = 'Creando backup...';
+    try {
+        const res = await fetch('/api/backups/create', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+            status.style.color = 'var(--status-ok-text)';
+            status.textContent = `✅ ${data.file}`;
+        } else {
+            status.style.color = 'var(--status-critical-text)';
+            status.textContent = '❌ Error al crear backup.';
+        }
+    } catch (e) {
+        status.style.color = 'var(--status-critical-text)';
+        status.textContent = '❌ Error de conexión.';
+    }
+    btn.disabled = false;
+    setTimeout(() => status.textContent = '', 4000);
+}
+
 async function loadNotificationConfig() {
     try {
         const config = await fetch('/api/notifications/config').then(r => r.json());
