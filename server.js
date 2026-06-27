@@ -25,7 +25,10 @@ app.use(express.static(path.join(__dirname)));
 // Base de datos SQLite
 // ============================================
 
-const db = new Database(process.env.DB_PATH || path.join(__dirname, 'restaurant-stock.db'));
+const dbPath = process.env.DB_PATH || path.join(__dirname, 'restaurant-stock.db');
+const dbDir = path.dirname(dbPath);
+if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
+const db = new Database(dbPath);
 
 // Habilitar WAL mode para mejor performance
 db.pragma('journal_mode = WAL');
