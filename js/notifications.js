@@ -48,7 +48,6 @@ function renderRecipients(recipients) {
         <div class="recipient-row" data-id="${r.id}">
             <span class="recipient-name">${escapeHtml(r.name)}</span>
             <span class="recipient-phone">${escapeHtml(r.phone)}</span>
-            <span class="recipient-key">key: ${escapeHtml(r.apikey)}</span>
             <button class="btn btn-delete recipient-delete" data-id="${r.id}" style="padding:4px 8px;font-size:0.75rem;">✕</button>
         </div>
     `).join('');
@@ -69,14 +68,59 @@ function openAddRecipientModal() {
     if (!name?.trim()) return;
     const phone = prompt('Número con código de país sin + (ej: 5491112345678):');
     if (!phone?.trim()) return;
-    const apikey = prompt('API Key de CallMeBot:');
-    if (!apikey?.trim()) return;
 
     fetch('/api/notifications/recipients', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: Date.now().toString(36), name: name.trim(), phone: phone.trim(), apikey: apikey.trim() })
+        body: JSON.stringify({ id: Date.now().toString(36), name: name.trim(), phone: phone.trim() })
     }).then(() => loadRecipients());
+}
+
+// ============================================
+// Estado de conexión WhatsApp
+// ============================================
+
+let waPollingInterval = null;
+
+async function loadWAStatus() {
+    try {
+        const data = await fetch('/api/whatsapp/status').then(r => r.json());
+        const dot = document.getElementById('wa-status-dot');
+        const text = document.getElementById('wa-status-text');
+        const qrContainer = document.getElementById('wa-qr-container');
+        const qrImg = document.getElementById('wa-qr-img');
+        const logoutBtn = document.getElementById('wa-logout-btn');
+
+        if (data.status === 'ready') {
+            dot.style.background = '#22c55e';
+            text.textContent = 'WhatsApp conectado ✓';
+            qrContainer.style.display = 'none';
+            logoutBtn.style.display = 'inline-block';
+            clearInterval(waPollingInterval);
+            waPollingInterval = null;
+        } else if (data.status === 'qr') {
+            dot.style.background = '#f59e0b';
+            text.textContent = 'Esperando escaneo del QR...';
+            qrContainer.style.display = 'block';
+            qrImg.src = data.qr || '';
+            logoutBtn.style.display = 'none';
+            if (!waPollingInterval) waPollingInterval = setInterval(loadWAStatus, 4000);
+        } else if (data.status === 'connecting') {
+            dot.style.background = '#3b82f6';
+            text.textContent = 'Conectando...';
+            qrContainer.style.display = 'none';
+            logoutBtn.style.display = 'none';
+            if (!waPollingInterval) waPollingInterval = setInterval(loadWAStatus, 3000);
+        } else {
+            dot.style.background = '#ef4444';
+            text.textContent = 'WhatsApp desconectado — iniciando...';
+            qrContainer.style.display = 'none';
+            logoutBtn.style.display = 'none';
+            if (!waPollingInterval) waPollingInterval = setInterval(loadWAStatus, 5000);
+        }
+    } catch (e) {
+        console.error('Error al obtener estado WA:', e);
+    }
 }
 
 // ============================================
@@ -89,7 +133,13 @@ async function loadNotificationConfig() {
         document.getElementById('notif-day').value = config.day_of_week || 'everyday';
         document.getElementById('notif-time').value = config.send_time || '08:00';
         document.getElementById('notif-enabled').checked = !!config.enabled;
-        await loadRecipients();
+        await Promise.all([loadRecipients(), loadWAStatus()]);
+
+        document.getElementById('wa-logout-btn').addEventListener('click', async () => {
+            if (!confirm('¿Desconectar WhatsApp? Tendrás que volver a escanear el QR.')) return;
+            await fetch('/api/whatsapp/logout', { method: 'POST' });
+            await loadWAStatus();
+        });
     } catch (e) {
         console.error('Error al cargar config de notificaciones:', e);
     }

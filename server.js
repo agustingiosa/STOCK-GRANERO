@@ -8,6 +8,8 @@ const fs = require('fs');
 const { initializeApp, cert } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
 const Database = require('better-sqlite3');
+const { Client, LocalAuth } = require('whatsapp-web.js');
+const QRCode = require('qrcode');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -28,6 +30,45 @@ if (process.env.FIREBASE_CREDENTIALS) {
 
 initializeApp({ credential: cert(serviceAccount) });
 const db = getFirestore();
+
+// ============================================
+// Cliente WhatsApp (whatsapp-web.js)
+// ============================================
+
+let waStatus = 'disconnected'; // 'disconnected' | 'qr' | 'connecting' | 'ready'
+let waQR = null;
+
+const waClient = new Client({
+    authStrategy: new LocalAuth({ dataPath: path.join(__dirname, '.wwebjs_auth') }),
+    puppeteer: { args: ['--no-sandbox', '--disable-setuid-sandbox'] }
+});
+
+waClient.on('qr', async (qr) => {
+    waStatus = 'qr';
+    waQR = await QRCode.toDataURL(qr);
+    console.log('📱 WhatsApp: escaneá el QR en la app para conectar');
+});
+
+waClient.on('authenticated', () => {
+    waStatus = 'connecting';
+    waQR = null;
+    console.log('🔐 WhatsApp: autenticado, iniciando sesión...');
+});
+
+waClient.on('ready', () => {
+    waStatus = 'ready';
+    waQR = null;
+    console.log('✅ WhatsApp conectado y listo');
+});
+
+waClient.on('disconnected', (reason) => {
+    waStatus = 'disconnected';
+    waQR = null;
+    console.log('⚠️ WhatsApp desconectado:', reason);
+    setTimeout(() => waClient.initialize(), 5000);
+});
+
+waClient.initialize().catch(e => console.error('Error iniciando WhatsApp:', e.message));
 
 // ============================================
 // Middleware
@@ -340,11 +381,11 @@ async function buildStockMessage() {
     return msg.trim();
 }
 
-async function sendWhatsApp(phone, apikey, message) {
-    const url = `https://api.callmebot.com/whatsapp.php?phone=${phone}&text=${encodeURIComponent(message)}&apikey=${apikey}`;
+async function sendWhatsApp(phone, message) {
+    if (waStatus !== 'ready') return { success: false, error: 'WhatsApp no conectado' };
     try {
-        const res = await fetch(url);
-        return { success: res.ok, response: await res.text() };
+        await waClient.sendMessage(`${phone}@c.us`, message);
+        return { success: true };
     } catch (e) { return { success: false, error: e.message }; }
 }
 
@@ -354,12 +395,23 @@ async function sendToAllRecipients(message) {
     if (recipients.length === 0) return { sent: 0, errors: 0 };
     let sent = 0, errors = 0;
     for (const r of recipients) {
-        const result = await sendWhatsApp(r.phone, r.apikey, message);
+        const result = await sendWhatsApp(r.phone, message);
         if (result.success) { sent++; console.log(`📱 WhatsApp enviado a ${r.name}`); }
-        else { errors++; console.error(`Error enviando a ${r.name}:`, result.error || result.response); }
+        else { errors++; console.error(`Error enviando a ${r.name}:`, result.error); }
     }
     return { sent, errors };
 }
+
+app.get('/api/whatsapp/status', (req, res) => {
+    res.json({ status: waStatus, qr: waQR });
+});
+
+app.post('/api/whatsapp/logout', async (req, res) => {
+    try {
+        await waClient.logout();
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
 app.get('/api/notifications/config', async (req, res) => {
     try {
@@ -390,8 +442,8 @@ app.get('/api/notifications/recipients', async (req, res) => {
 
 app.post('/api/notifications/recipients', async (req, res) => {
     try {
-        const { id, name, phone, apikey } = req.body;
-        await db.collection('recipients').doc(id).set({ id, name: name.trim(), phone: phone.trim(), apikey: apikey.trim() });
+        const { id, name, phone } = req.body;
+        await db.collection('recipients').doc(id).set({ id, name: name.trim(), phone: phone.trim() });
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });

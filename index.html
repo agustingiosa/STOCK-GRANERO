@@ -166,8 +166,20 @@
                 <!-- WhatsApp -->
                 <div style="margin-top:24px;">
                     <h3 style="font-size:0.95rem;color:var(--text-heading);margin-bottom:10px;font-weight:600;">📱 Notificación WhatsApp de stock bajo</h3>
+
+                    <!-- Estado de conexión WA -->
                     <div class="daily-stock-info" style="margin-bottom:16px;">
-                        <p>Usamos <strong>CallMeBot</strong> (gratis). Cada número necesita su propia API key. Para activarla: agregá el número <strong>+34 644 69 74 70</strong> a los contactos, mandales <em>"I allow callmebot to send me messages"</em> y responden con la key.</p>
+                        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <span id="wa-status-dot" style="width:10px;height:10px;border-radius:50%;background:#aaa;flex-shrink:0;display:inline-block;"></span>
+                                <span id="wa-status-text" style="font-size:0.85rem;">Cargando...</span>
+                            </div>
+                            <button id="wa-logout-btn" class="btn btn-delete" style="display:none;padding:4px 10px;font-size:0.75rem;">Desconectar</button>
+                        </div>
+                        <div id="wa-qr-container" style="display:none;margin-top:14px;text-align:center;">
+                            <p style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:10px;">Abrí WhatsApp → Dispositivos vinculados → Vincular un dispositivo → escaneá este QR</p>
+                            <img id="wa-qr-img" src="" alt="QR WhatsApp" style="max-width:200px;border-radius:8px;border:1px solid var(--border-color);" />
+                        </div>
                     </div>
 
                     <!-- Destinatarios -->

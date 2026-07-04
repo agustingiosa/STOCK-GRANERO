@@ -8,3 +8,6 @@ serviceAccountKey.json
 !.env.example
 backups/
 .firebase/
+.wwebjs_auth/
+.wwebjs_cache/
+.DS_Store
