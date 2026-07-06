@@ -72,6 +72,7 @@ addForm.addEventListener('submit', async (e) => {
     const sector = document.getElementById('ap-sector').value;
     const unit = document.getElementById('ap-unit').value;
     const minStock = document.getElementById('ap-min-stock').value;
+    const recommendedStock = document.getElementById('ap-recommended-stock').value;
     const price = document.getElementById('ap-price').value;
 
     if (!name || !sector || !unit || minStock === '') {
@@ -79,7 +80,7 @@ addForm.addEventListener('submit', async (e) => {
         return;
     }
 
-    await addProduct(name, sector, unit, minStock, price);
+    await addProduct(name, sector, unit, minStock, recommendedStock, price);
     addForm.reset();
     document.getElementById('ap-sector').value = '';
     document.getElementById('ap-unit').value = '';
@@ -97,6 +98,7 @@ document.getElementById('edit-form').addEventListener('submit', async (e) => {
     const sector = document.getElementById('edit-sector').value;
     const unit = document.getElementById('edit-unit').value;
     const minStock = document.getElementById('edit-min-stock').value;
+    const recommendedStock = document.getElementById('edit-recommended-stock').value;
     const price = document.getElementById('edit-price').value;
 
     if (!name || !sector || !unit || minStock === '') {
@@ -104,7 +106,7 @@ document.getElementById('edit-form').addEventListener('submit', async (e) => {
         return;
     }
 
-    await updateProduct(id, name, sector, unit, minStock, price);
+    await updateProduct(id, name, sector, unit, minStock, recommendedStock, price);
     closeEditModal();
 });
 

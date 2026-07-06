@@ -110,9 +110,11 @@ app.get('/api/products', async (req, res) => {
 
 app.post('/api/products', async (req, res) => {
     try {
-        const { id, name, sector, unit, min_stock, price, created_at } = req.body;
+        const { id, name, sector, unit, min_stock, recommended_stock, price, created_at } = req.body;
         await db.collection('products').doc(id).set({
-            id, name, sector, unit, min_stock, price: price || null,
+            id, name, sector, unit, min_stock,
+            recommended_stock: recommended_stock ?? min_stock,
+            price: price || null,
             created_at, updated_at: null, last_stock: null, last_stock_date: null
         });
         res.json({ success: true });
@@ -121,8 +123,12 @@ app.post('/api/products', async (req, res) => {
 
 app.put('/api/products/:id', async (req, res) => {
     try {
-        const { name, sector, unit, min_stock, price, updated_at } = req.body;
-        await db.collection('products').doc(req.params.id).update({ name, sector, unit, min_stock, price: price || null, updated_at });
+        const { name, sector, unit, min_stock, recommended_stock, price, updated_at } = req.body;
+        await db.collection('products').doc(req.params.id).update({
+            name, sector, unit, min_stock,
+            recommended_stock: recommended_stock ?? min_stock,
+            price: price || null, updated_at
+        });
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -360,31 +366,54 @@ function getSectorName(sector) {
     return SECTOR_LABELS[sector] || `📦 ${sector}`;
 }
 
+function fmt(n) {
+    const v = parseFloat(n);
+    return Number.isInteger(v) ? String(v) : v.toFixed(2).replace(/\.?0+$/, '');
+}
+
 async function buildStockMessage() {
-    const snap = await db.collection('products').orderBy('sector').orderBy('name').get();
-    const lowStock = snap.docs.map(d => d.data()).filter(p => p.last_stock !== null && p.last_stock !== undefined && p.last_stock <= p.min_stock);
+    const snap = await db.collection('products').get();
+    const lowStock = snap.docs.map(d => d.data())
+        .filter(p => p.last_stock !== null && p.last_stock !== undefined && p.last_stock <= p.min_stock)
+        .sort((a, b) => a.sector.localeCompare(b.sector) || a.name.localeCompare(b.name));
     if (lowStock.length === 0) return null;
 
     const bySector = {};
     lowStock.forEach(p => { if (!bySector[p.sector]) bySector[p.sector] = []; bySector[p.sector].push(p); });
 
     const date = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    let msg = `🛒 *PEDIDO DE STOCK - ${date}*\n_Productos por debajo del stock mínimo_\n\n`;
+    const total = lowStock.length;
+    const sep = '──────────────────';
+
+    let msg = `🛒 *PEDIDO DE STOCK — ${date}*\n`;
+    msg += `_${total} producto${total !== 1 ? 's' : ''} para reponer_\n`;
+
     Object.entries(bySector).forEach(([sector, prods]) => {
-        msg += `*${getSectorName(sector)}*\n`;
+        msg += `\n*${getSectorName(sector)}*\n`;
         prods.forEach(p => {
-            const aReponer = Math.max(0, p.min_stock - p.last_stock).toFixed(2);
-            msg += `• ${p.name}: tiene ${parseFloat(p.last_stock).toFixed(2)} ${p.unit} — pedir ${aReponer} ${p.unit}\n`;
+            const target = p.recommended_stock ?? p.min_stock;
+            const aReponer = Math.max(0, target - p.last_stock);
+            const dot = p.last_stock === 0 ? '🔴' : '🟡';
+            msg += `${dot} ${p.name}\n   Hay: ${fmt(p.last_stock)} ${p.unit} | Pedir: *${fmt(aReponer)} ${p.unit}*\n`;
         });
-        msg += '\n';
     });
+
     return msg.trim();
 }
 
-async function sendWhatsApp(phone, message) {
+async function sendWhatsApp(recipient, message) {
     if (waStatus !== 'ready') return { success: false, error: 'WhatsApp no conectado' };
     try {
-        await waClient.sendMessage(`${phone}@c.us`, message);
+        let chatId;
+        if (recipient.type === 'group') {
+            chatId = recipient.chatId;
+        } else {
+            const cleanPhone = recipient.phone.replace(/\D/g, '');
+            const numberId = await waClient.getNumberId(cleanPhone);
+            if (!numberId) return { success: false, error: 'Número no encontrado en WhatsApp' };
+            chatId = numberId._serialized;
+        }
+        await waClient.sendMessage(chatId, message);
         return { success: true };
     } catch (e) { return { success: false, error: e.message }; }
 }
@@ -394,16 +423,29 @@ async function sendToAllRecipients(message) {
     const recipients = snap.docs.map(d => d.data());
     if (recipients.length === 0) return { sent: 0, errors: 0 };
     let sent = 0, errors = 0;
+    const errorDetails = [];
     for (const r of recipients) {
-        const result = await sendWhatsApp(r.phone, message);
+        const result = await sendWhatsApp(r, message);
         if (result.success) { sent++; console.log(`📱 WhatsApp enviado a ${r.name}`); }
-        else { errors++; console.error(`Error enviando a ${r.name}:`, result.error); }
+        else { errors++; errorDetails.push(`${r.name}: ${result.error}`); console.error(`Error enviando a ${r.name}:`, result.error); }
     }
-    return { sent, errors };
+    return { sent, errors, errorDetails };
 }
 
 app.get('/api/whatsapp/status', (req, res) => {
     res.json({ status: waStatus, qr: waQR });
+});
+
+app.get('/api/whatsapp/groups', async (req, res) => {
+    if (waStatus !== 'ready') return res.status(503).json({ error: 'WhatsApp no conectado' });
+    try {
+        const chats = await waClient.getChats();
+        const groups = chats
+            .filter(c => c.isGroup)
+            .map(c => ({ id: c.id._serialized, name: c.name }))
+            .sort((a, b) => a.name.localeCompare(b.name));
+        res.json(groups);
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/whatsapp/logout', async (req, res) => {
@@ -422,9 +464,9 @@ app.get('/api/notifications/config', async (req, res) => {
 
 app.post('/api/notifications/config', async (req, res) => {
     try {
-        const { day_of_week, send_time, enabled } = req.body;
+        const { days, send_time, enabled } = req.body;
         await db.collection('notifications').doc('config').set({
-            day_of_week: day_of_week || 'everyday',
+            days: Array.isArray(days) ? days : [],
             send_time: send_time || '08:00',
             enabled: !!enabled,
             last_sent: ''
@@ -442,8 +484,11 @@ app.get('/api/notifications/recipients', async (req, res) => {
 
 app.post('/api/notifications/recipients', async (req, res) => {
     try {
-        const { id, name, phone } = req.body;
-        await db.collection('recipients').doc(id).set({ id, name: name.trim(), phone: phone.trim() });
+        const { id, name, type, phone, chatId, groupName } = req.body;
+        const data = type === 'group'
+            ? { id, name: name.trim(), type: 'group', chatId, groupName }
+            : { id, name: name.trim(), type: 'individual', phone: phone.trim() };
+        await db.collection('recipients').doc(id).set(data);
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -481,7 +526,8 @@ setInterval(async () => {
         const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
         const currentKey = `${now.toISOString().split('T')[0]}_${currentTime}`;
 
-        const dayMatch = config.day_of_week === 'everyday' || config.day_of_week === currentDay;
+        const days = config.days || (config.day_of_week === 'everyday' ? ['0','1','2','3','4','5','6'] : [config.day_of_week]);
+        const dayMatch = days.includes(currentDay);
         if (!dayMatch || config.send_time !== currentTime || config.last_sent === currentKey) return;
 
         const message = await buildStockMessage();

@@ -14,6 +14,7 @@ async function loadProducts() {
             sector: p.sector,
             unit: p.unit,
             minStock: p.min_stock,
+            recommendedStock: p.recommended_stock ?? p.min_stock,
             price: p.price,
             lastStock: p.last_stock,
             lastStockDate: p.last_stock_date,
@@ -26,10 +27,11 @@ async function loadProducts() {
     }
 }
 
-async function addProduct(name, sector, unit, minStock, price) {
+async function addProduct(name, sector, unit, minStock, recommendedStock, price) {
     const id = generateId();
     const now = new Date().toISOString();
     const priceVal = price ? parseFloat(price) : null;
+    const minVal = parseFloat(minStock) || 0;
 
     try {
         await apiAddProduct({
@@ -37,7 +39,8 @@ async function addProduct(name, sector, unit, minStock, price) {
             name: name.trim(),
             sector,
             unit,
-            min_stock: parseFloat(minStock) || 0,
+            min_stock: minVal,
+            recommended_stock: recommendedStock !== '' ? parseFloat(recommendedStock) : minVal,
             price: priceVal,
             created_at: now
         });
@@ -54,16 +57,18 @@ async function addProduct(name, sector, unit, minStock, price) {
     }
 }
 
-async function updateProduct(id, name, sector, unit, minStock, price) {
+async function updateProduct(id, name, sector, unit, minStock, recommendedStock, price) {
     const now = new Date().toISOString();
     const priceVal = price ? parseFloat(price) : null;
+    const minVal = parseFloat(minStock) || 0;
 
     try {
         await apiUpdateProduct(id, {
             name: name.trim(),
             sector,
             unit,
-            min_stock: parseFloat(minStock) || 0,
+            min_stock: minVal,
+            recommended_stock: recommendedStock !== '' ? parseFloat(recommendedStock) : minVal,
             price: priceVal,
             updated_at: now
         });
@@ -106,6 +111,7 @@ function editProduct(id) {
     document.getElementById('edit-sector').value = product.sector;
     document.getElementById('edit-unit').value = product.unit;
     document.getElementById('edit-min-stock').value = product.minStock;
+    document.getElementById('edit-recommended-stock').value = product.recommendedStock;
     document.getElementById('edit-price').value = product.price || '';
     document.getElementById('edit-modal').classList.remove('hidden');
 }
@@ -151,6 +157,7 @@ function createBulkRow() {
             <option value="">...</option>${buildUnitOptions()}
         </select></td>
         <td><input type="number" class="bulk-min" placeholder="0" min="0" step="0.01" style="${BULK_NUM_STYLE}"></td>
+        <td><input type="number" class="bulk-recommended" placeholder="=mín" min="0" step="0.01" style="${BULK_NUM_STYLE}"></td>
         <td><input type="number" class="bulk-stock" placeholder="-" min="0" step="0.01" style="${BULK_NUM_STYLE}"></td>
         <td><button class="bulk-remove btn btn-delete" style="padding:4px 8px;font-size:0.75rem;">✕</button></td>
     `;
@@ -186,8 +193,9 @@ async function saveBulkProducts() {
         const sector = row.querySelector('.bulk-sector').value;
         const unit = row.querySelector('.bulk-unit').value;
         const min = row.querySelector('.bulk-min').value;
+        const recommended = row.querySelector('.bulk-recommended').value;
         const stock = row.querySelector('.bulk-stock').value;
-        if (name && sector && unit && min !== '') toSave.push({ name, sector, unit, min, stock });
+        if (name && sector && unit && min !== '') toSave.push({ name, sector, unit, min, recommended, stock });
     });
 
     if (toSave.length === 0) {
@@ -210,6 +218,7 @@ async function saveBulkProducts() {
             sector: p.sector,
             unit: p.unit,
             min_stock: parseFloat(p.min) || 0,
+            recommended_stock: p.recommended !== '' ? parseFloat(p.recommended) : parseFloat(p.min) || 0,
             price: null,
             created_at: now
         });
@@ -289,23 +298,24 @@ function renderPedidos() {
                         <thead><tr>
                             <th>Producto</th>
                             <th>Stock Actual</th>
-                            <th>Stock Mínimo</th>
+                            <th>Stock Recomendado</th>
                             <th>Estado</th>
-                            <th>A reponer</th>
+                            <th>A pedir</th>
                         </tr></thead>
                         <tbody>`;
 
         bySector[sector].forEach(product => {
             const stock = parseFloat(product.lastStock);
             const min = parseFloat(product.minStock);
+            const recommended = parseFloat(product.recommendedStock ?? product.minStock);
             const status = getStockStatus(stock, min);
-            const aReponer = Math.max(0, min - stock).toFixed(2);
+            const aReponer = Math.max(0, recommended - stock).toFixed(2);
             const unit = getUnitLabel(product.unit);
 
             html += `<tr>
                 <td><strong>${escapeHtml(product.name)}</strong></td>
                 <td>${stock.toFixed(2)} ${unit}</td>
-                <td>${min.toFixed(2)} ${unit}</td>
+                <td>${recommended.toFixed(2)} ${unit}</td>
                 <td><span class="status-badge ${status.class}">${status.label}</span></td>
                 <td><strong>${aReponer} ${unit}</strong></td>
             </tr>`;
@@ -374,6 +384,7 @@ function renderProducts() {
                 <td>${getSectorLabel(product.sector)}</td>
                 <td>${getUnitLabel(product.unit)}</td>
                 <td>${parseFloat(product.minStock).toFixed(2)}</td>
+                <td>${parseFloat(product.recommendedStock ?? product.minStock).toFixed(2)}</td>
                 <td class="${product.lastStock !== null ? getStockColorClass(product.lastStock, product.minStock) : ''}">${lastStockDisplay}</td>
                 <td>${lastDateDisplay}</td>
                 <td><span class="status-badge ${status.class}">${status.label}</span></td>
